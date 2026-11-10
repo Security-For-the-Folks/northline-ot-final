@@ -102,9 +102,6 @@ An assessment report, same standard as the hardware final:
   an unauthorized command through*.
 - Remediation — how you would stop this, in OT terms.
 
-Use the course report template. A short live walkthrough may be required — check
-the assignment.
-
 ---
 
 ## Layout
@@ -114,11 +111,3 @@ env/                     the lab environment (docker compose)
 modbus-tools.md          tool reference for mbpoll and the pymodbus console
 OT Final Project - Student Guide.pptx   project brief and rubric
 ```
-
-## A word on difficulty
-
-Nothing here is a memory-corruption bug or a puzzle for its own sake. Every
-step is a real technique against a realistic control cell: find the way in,
-prove who the device is, learn how it speaks from its own vendor's manual, and
-show what one wrong command does to a room full of servers. If you get stuck,
-you are missing information you can go and get — not a trick.
