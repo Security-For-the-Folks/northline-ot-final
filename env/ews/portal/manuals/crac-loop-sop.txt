@@ -1,0 +1,19 @@
+CRAC / CHILLED-WATER LOOP - STANDARD OPERATING NOTES
+Node MW-ENG-01, Row A cold aisle
+----------------------------------------------------
+
+Purpose
+  Row A is cooled by a chilled-water CRAC unit. Supply-air temperature is held
+  by modulating the evaporator/blower fan. The fan motor is driven by a
+  variable-frequency drive (VFD) in the Row A control panel.
+
+Control
+  The VFD holds fan speed from the loop controller. Drive parameters are set at
+  commissioning - do not change drive settings from a live session without an
+  approved work order.
+
+If cold aisle is climbing
+  1. Confirm blower is running.
+  2. Confirm chilled-water valve open and pump running.
+  3. Check the drive front panel / HMI for an active fault code.
+  4. Escalate per the DC-EAST runbook.

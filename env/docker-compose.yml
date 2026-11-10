@@ -1,0 +1,84 @@
+# Cap each container's log at 3 x 10 MB. Docker's default json-file driver never
+# rotates, so a long session (HMI request log, Modbus error spam) grows without bound.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  # --- IT side -------------------------------------------------------------
+  toolbox:
+    logging: *default-logging
+    build: ./toolbox
+    container_name: toolbox
+    hostname: toolbox
+    command: ["sleep", "infinity"]
+    networks:
+      it-net:
+        ipv4_address: 172.30.10.20
+    cap_add: ["NET_RAW", "NET_ADMIN"]   # let nmap do raw-socket scans
+
+  ews:
+    logging: *default-logging
+    build: ./ews
+    container_name: ews
+    hostname: ews
+    networks:
+      it-net:
+        ipv4_address: 172.30.10.10
+      ot-net:
+        ipv4_address: 172.21.5.10
+
+  # --- OT side -------------------------------------------------------------
+  vfd:
+    logging: *default-logging
+    build: ./vfd
+    container_name: vfd
+    hostname: atv630
+    networks:
+      ot-net:
+        ipv4_address: 172.21.5.20
+
+  hmi:
+    logging: *default-logging
+    build: ./hmi
+    container_name: hmi
+    hostname: hmi
+    environment:
+      - VFD_HOST=172.21.5.20
+      - VFD_PORT=502
+    ports:
+      - "8080:8080"          # operator dashboard, viewed from the host browser
+    networks:
+      ot-net:
+        ipv4_address: 172.21.5.30
+      view-net: {}
+    depends_on:
+      - vfd
+
+  historian:
+    logging: *default-logging
+    build: ./historian
+    container_name: historian
+    hostname: historian
+    networks:
+      ot-net:
+        ipv4_address: 172.21.5.40
+
+networks:
+  it-net:
+    internal: true
+    ipam:
+      config:
+        - subnet: 172.30.10.0/24
+  ot-net:
+    internal: true
+    ipam:
+      config:
+        - subnet: 172.21.5.0/24
+  view-net:
+    # normal bridge; exists only to publish the HMI port to the host
+    ipam:
+      config:
+        - subnet: 172.31.9.0/24

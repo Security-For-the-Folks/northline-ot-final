@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="day">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Row A Cooling — Operator Station</title>
+<style>
+  :root{
+    --field:#0c62dd; --grid:#2f7be8;
+    --win:#c9ccd1; --face:#c3c7cc; --hl:#ffffff; --sh:#82868c; --dsh:#4c5054;
+    --ttl1:#0a2f9c; --ttl2:#3f7ae0; --ttlink:#ffffff;
+    --ink:#0b0f14; --sub:#2a3038; --yell:#ffe23a; --band:#000000;
+    --lcd:#33ff7a; --lcda:#ffc23a; --lcdr:#ff5b4a; --lcdbg:#04130a; --lcdoff:#0d3a1f;
+    --okg:#12a02a; --unit:#2a5bd0; --lamp:#3a4a2a; --pipe:#b3bbc4; --pipehi:#eef3f8; --pipesh:#6c727a;
+    --eqf:#aeb6be; --eqf2:#8f97a0; --eqd:#6c727a; --eqhi:#eef3f8; --eqstroke:#5c626a; --valv:#c9ccd1;
+    --mono:"Cascadia Mono","Consolas","Lucida Console","DejaVu Sans Mono",monospace;
+    --ui:"Tahoma","MS Sans Serif","Segoe UI",Geneva,sans-serif;
+  }
+  html[data-theme="night"]{
+    --field:#081c40; --grid:#123056;
+    --win:#3b4048; --face:#454a52; --hl:#6a7078; --sh:#282c31; --dsh:#161a1e;
+    --ttl1:#08205e; --ttl2:#245aa8; --ttlink:#e8eef6;
+    --ink:#e6ebf0; --sub:#aab4bf; --yell:#ffe23a; --band:#000000;
+    --lcd:#33ff7a; --lcda:#ffc23a; --lcdr:#ff5b4a; --lcdbg:#020c06; --lcdoff:#0a2c17;
+    --okg:#0e7a20; --unit:#1e4290; --lamp:#2a331f; --pipe:#7d858f; --pipehi:#aab2bc; --pipesh:#3c424a;
+    --eqf:#6b7178; --eqf2:#565c63; --eqd:#3f444a; --eqhi:#8a9098; --eqstroke:#2c3137; --valv:#5a6068;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0}
+  body{background:#0a2a6a;color:var(--ink);font:12px/1.35 var(--ui);overflow:hidden}
+  /* active-fault banner: shown only when the drive reports a populated fault string */
+  .faultbanner{display:none;background:#b3140c;color:#fff;font:700 13px/1.45 var(--mono);
+    padding:7px 14px;letter-spacing:.04em;text-align:center;
+    border-top:2px solid #ff5b4a;border-bottom:2px solid #7a0d08;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .faultbanner.on{display:block;animation:fbblink 1s steps(2,end) infinite}
+  @keyframes fbblink{50%{background:#7a0d08}}
+
+  .app{position:fixed;inset:0;display:grid;grid-template-rows:auto auto 1fr auto auto;
+       background:var(--win);border:3px solid;border-color:var(--hl) var(--dsh) var(--dsh) var(--hl)}
+
+  /* title bar (classic) */
+  .titlebar{height:26px;display:flex;align-items:center;gap:7px;padding:0 4px 0 6px;
+            background:linear-gradient(90deg,var(--ttl1),var(--ttl2));color:var(--ttlink);user-select:none}
+  .titlebar .ic{width:16px;height:16px}
+  .titlebar b{font-size:12px;font-weight:700;letter-spacing:.2px}
+  .titlebar .sp{flex:1}
+  .tbtn{width:22px;height:20px;display:flex;align-items:center;justify-content:center;
+        background:var(--face);border:2px solid;border-color:var(--hl) var(--dsh) var(--dsh) var(--hl);
+        color:var(--ink);cursor:pointer}
+  .tbtn:active{border-color:var(--dsh) var(--hl) var(--hl) var(--dsh)}
+  .tbtn svg{width:11px;height:11px;stroke:currentColor;fill:none;stroke-width:2}
+  .tbtn.tg{font-family:var(--ui);font-weight:700;font-size:12px;line-height:1;padding-bottom:1px}
+
+  /* process-title yellow band */
+  .band{height:24px;background:var(--band);display:flex;align-items:center;padding:0 10px;
+        border-top:2px solid var(--dsh);border-bottom:2px solid var(--dsh)}
+  .band .t{color:var(--yell);font-weight:700;font-size:13px;letter-spacing:.6px;
+           flex:1;text-align:center;text-shadow:0 1px 0 #000}
+  .band .clk{color:#cfe0ff;font-family:var(--mono);font-size:12px}
+  .band .id{color:#8fb0ee;font-family:var(--mono);font-size:11px;margin-right:14px}
+
+  /* the blue process field */
+  .field{position:relative;background:var(--field);overflow:hidden;
+         border:2px solid;border-color:var(--dsh) var(--hl) var(--hl) var(--dsh)}
+  .view{position:absolute;inset:0}
+  .view.off{display:none}
+  svg.pg{position:absolute;inset:0;width:100%;height:100%}
+
+  /* SVG process styles */
+  .pipe-o{stroke:var(--pipesh);stroke-width:9;fill:none}
+  .pipe-i{stroke:var(--pipe);stroke-width:6;fill:none}
+  .pipe-h{stroke:var(--pipehi);stroke-width:1.6;fill:none;opacity:.7}
+  .duct{stroke:var(--pipesh);stroke-width:9;fill:none;stroke-dasharray:1 5;stroke-linecap:round}
+  .eqf{fill:var(--eqf);stroke:var(--eqstroke);stroke-width:1.5} .eqf2{fill:var(--eqf2);stroke:var(--eqstroke);stroke-width:1.2}
+  .eqd{fill:var(--eqd)} .eqhi{fill:var(--eqhi)} .fin{stroke:var(--eqstroke);stroke-width:3}
+  .lbl{fill:#eaf0ff;font:11px var(--ui);font-weight:600} .lbls{fill:#b9c9ef;font:10px var(--mono)}
+  .arrow{fill:#bfe0ff}
+  .valv{fill:var(--valv);stroke:var(--eqstroke);stroke-width:1.4}
+
+  /* fan */
+  .blades{transform-box:fill-box;transform-origin:center;animation:spin 1s linear infinite;will-change:transform}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .fan .bl{fill:#cfd6de;stroke:#5c626a;stroke-width:.6}
+  .fan.run .bl{fill:#d7dee6} .fan.stop .bl{fill:#9aa0a8} .fan.fault .bl{fill:#d0574a} .fan.unknown .bl{fill:#8890a0;opacity:.6}
+  .fan .hub{fill:#5c626a} .fan .ring{fill:#141c30;stroke:#3a4568;stroke-width:1.5}
+  .fan.run .ring{stroke:#2f8f4a}
+
+  /* LCD tag boxes (built in JS) */
+  .tb-bg{fill:#0a0f16;stroke:#000;stroke-width:1}
+  .tb-ok{fill:var(--okg)} .tb-ok.off{fill:#5a2020} .tb-ok.warn{fill:#b5860f}
+  .tb-okt{fill:#eafff0;font:bold 10px var(--ui)}
+  .tb-u{fill:var(--unit)} .tb-ut{fill:#dfe8ff;font:9px var(--ui)}
+  .tb-lab{fill:#cfe0ff;font:10px var(--ui);font-weight:600}
+  .tb-val{font-family:var(--mono);font-weight:700;font-size:14px;fill:var(--lcd)}
+  .tb-val.warn{fill:var(--lcda)} .tb-val.crit{fill:var(--lcdr)} .tb-val.off{fill:var(--lcdoff)}
+
+  /* annunciator */
+  .ann-tile{fill:#0c1330;stroke:#00000060;stroke-width:1}
+  .ann-txt{fill:#5f6f52;font:bold 10px var(--ui);text-anchor:middle}
+  .ann-tile.warn{fill:#6a5410} .ann-tile.crit{fill:#6e1c14}
+  .ann-txt.warn{fill:#ffdf7a} .ann-txt.crit{fill:#ffd0c8}
+  .ann-lamp{fill:#20301a;stroke:#0a140a;stroke-width:1}
+  .ann-lamp.warn{fill:#ffd24a} .ann-lamp.crit{fill:#ff6a4a}
+
+  /* faceplate boxes (retro control box) */
+  .cbox{fill:#c7cbd0;stroke:#000;stroke-width:1}         /* physical light bezel — legible in day AND night */
+  .cbox-hl{stroke:#ffffff;stroke-width:1.5;fill:none} .cbox-sh{stroke:#4c5054;stroke-width:1.5;fill:none}
+  .cbox-t{fill:#0b0f14;font:bold 11px var(--ui)}
+  .chip{stroke-width:2;fill:#0a0f16}
+  .chip-run{fill:#0d7a1e} .chip-stop{fill:#7a1410} .chip-warn{fill:#7a5a10}
+  .chip-t{fill:#eafff0;font:bold 11px var(--ui);text-anchor:middle}
+  .seg{font-family:var(--mono);font-weight:700;font-size:12px}
+
+  /* drive-detail page (thermal bars + register list + fault box) */
+  .ddbox{fill:#0a0f16;stroke:#000;stroke-width:1}
+  .ddttl{fill:#cfe0ff;font:700 12px var(--ui)} .ddlab{fill:#9fc0ff;font:11px var(--ui)}
+  .ddval{fill:var(--lcd);font-family:var(--mono);font-weight:700;font-size:13px}
+  .ddval.warn{fill:var(--lcda)} .ddval.crit{fill:var(--lcdr)} .ddval.off{fill:var(--lcdoff)}
+  .ddtrack{fill:#04130a;stroke:#000;stroke-width:1}
+  .ddbar{fill:var(--lcd)} .ddbar.warn{fill:var(--lcda)} .ddbar.crit{fill:var(--lcdr)}
+  .ddtick{stroke:#6a5a20;stroke-width:1} .ddtick.crit{stroke:#6a2a20}
+  .ddunit{fill:#7fa0d0;font:10px var(--mono)}
+
+  /* bottom nav (beveled buttons) */
+  .nav{display:flex;gap:6px;padding:7px 8px;background:var(--win);
+       border-top:2px solid var(--hl)}
+  .nav button{flex:0 0 auto;min-width:118px;height:40px;padding:0 12px;cursor:pointer;
+       background:var(--face);color:var(--ink);font:700 11px var(--ui);letter-spacing:.3px;
+       border:2px solid;border-color:var(--hl) var(--dsh) var(--dsh) var(--hl);
+       display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px}
+  .nav button .s{font-weight:400;font-size:9.5px;color:var(--sub)}
+  .nav button:active,.nav button.on{border-color:var(--dsh) var(--hl) var(--hl) var(--dsh);
+       background:var(--win)}
+  .nav button.on{box-shadow:inset 0 0 0 1px #0a2f9c40}
+  .nav .sp{flex:1}
+  .nav .clockbtn{min-width:150px;cursor:default}
+  .nav .clockbtn:active{border-color:var(--hl) var(--dsh) var(--dsh) var(--hl)}
+
+  /* status bar */
+  .status{display:flex;height:22px;background:var(--win);align-items:stretch}
+  .status .s{display:flex;align-items:center;gap:6px;padding:0 9px;font-size:11px;color:var(--sub);
+             border:2px solid;border-color:var(--dsh) var(--hl) var(--hl) var(--dsh);margin:2px 0 2px 3px}
+  .status .s:last-child{margin-right:3px}
+  .status .s b{color:var(--ink);font-family:var(--mono)}
+  .status .sp{flex:1;border:none;margin:0}
+  .led{width:9px;height:9px;border-radius:50%;background:#12a02a;border:1px solid #0006}
+  .led.bad{background:#d02a1a} .led.warn{background:#e0a020}
+
+  /* trend view */
+  .trendwrap{position:absolute;inset:14px;background:#04130a;border:2px solid;
+             border-color:var(--dsh) var(--hl) var(--hl) var(--dsh)}
+  .tgrid{stroke:#0f3a22;stroke-width:1} .tlabel{fill:#7fd7a0;font:10px var(--mono)}
+  #b_tline{fill:none;stroke:var(--lcda);stroke-width:2} #b_fline{fill:none;stroke:var(--lcd);stroke-width:2}
+  #b_warn{stroke:#6a5a20;stroke-dasharray:4 4} #b_crit{stroke:#6a2a20;stroke-dasharray:4 4}
+  .trendhdr{position:absolute;top:2px;left:0;right:0;text-align:center;color:var(--yell);
+            font:700 12px var(--ui);letter-spacing:.5px;padding-top:2px}
+  .tlegend{position:absolute;top:6px;right:12px;display:flex;gap:14px;font:11px var(--mono);z-index:2}
+  .tlegend .t{color:var(--lcda)} .tlegend .f{color:var(--lcd)} .tlegend .w{color:#c9b060} .tlegend .c{color:#d08070}
+
+  /* alarm + network views */
+  .listwrap{position:absolute;inset:14px;background:#061634;border:2px solid;
+            border-color:var(--dsh) var(--hl) var(--hl) var(--dsh);overflow:auto}
+  table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:12px}
+  th{position:sticky;top:0;background:#0a2f9c;color:#fff;text-align:left;padding:5px 9px;font-weight:700;
+     font-family:var(--ui);font-size:11px;border-bottom:1px solid #001}
+  td{padding:4px 9px;border-bottom:1px solid #12306033;color:#cfe0ff}
+  tr.warn td{color:var(--lcda)} tr.crit td{color:var(--lcdr)} tr.ok td{color:var(--lcd)}
+  .netbox{fill:#0a1a44;stroke:#6fa0ff;stroke-width:1.5} .netbox.drv{stroke:#4fe08a} .netbox.self{stroke:#ffe23a}
+  .nettxt{fill:#eaf0ff;font:12px var(--ui);font-weight:600} .netsm{fill:#9fc0ff;font:11px var(--mono)}
+  .netline{stroke:#3a5aa8;stroke-width:1.5} .netline.mb{stroke:#4fe08a;stroke-width:2}
+
+  /* alarm acknowledge toolbar + rows */
+  .altools{position:absolute;left:14px;right:14px;top:14px;height:34px;display:flex;align-items:center;gap:12px;
+           background:#061634;border:2px solid;border-color:var(--dsh) var(--hl) var(--hl) var(--dsh);padding:0 10px}
+  .albtn{height:24px;padding:0 14px;background:var(--face);color:var(--ink);font:700 11px var(--ui);cursor:pointer;
+         border:2px solid;border-color:var(--hl) var(--dsh) var(--dsh) var(--hl)}
+  .albtn:active{border-color:var(--dsh) var(--hl) var(--hl) var(--dsh)}
+  .alinfo{color:#cfe0ff;font:11px var(--ui)} .alinfo b{color:#fff;font-family:var(--mono)}
+  .alist{top:58px}
+  .rack{height:19px;padding:0 9px;background:var(--face);color:var(--ink);font:700 10px var(--ui);cursor:pointer;
+        border:2px solid;border-color:var(--hl) var(--dsh) var(--dsh) var(--hl)}
+  .rack:active{border-color:var(--dsh) var(--hl) var(--hl) var(--dsh)}
+  .ackd{color:#6fd08a;font:10px var(--mono)}
+  @keyframes almblink{50%{opacity:.32}}
+  tr.unack.crit td,tr.unack.warn td{animation:almblink 1s steps(1,end) infinite}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- title bar -->
+  <div class="titlebar">
+    <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 20V8l7-4 7 4v12"/><path d="M9 20v-6h6v6"/></svg>
+    <b>Row A Cooling — Operator Station</b>
+    <span class="sp"></span>
+    <div class="tbtn" id="daynight" title="Day / night"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M6 6l1 1M17 17l1 1M18 6l-1 1M7 17l-1 1"/></svg></div>
+    <div class="tbtn tg" title="Minimize">&#8211;</div>
+    <div class="tbtn tg" title="Maximize">&#9723;</div>
+    <div class="tbtn tg" title="Close">&#10005;</div>
+  </div>
+
+  <!-- process title band -->
+  <div class="band">
+    <span class="id">DC-COOL-VFD-01</span>
+    <span class="t" id="bandtitle">CHILLED-WATER &amp; SUPPLY-AIR OVERVIEW</span>
+    <span class="clk" id="clk">--:--:--</span>
+  </div>
+
+  <!-- active-fault banner: the drive only writes this string after a thermal-critical trip -->
+  <div class="faultbanner" id="faultbanner"></div>
+
+  <!-- process field -->
+  <div class="field">
+
+    <!-- OVERVIEW -->
+    <div class="view" id="v_overview">
+      <svg class="pg" viewBox="0 0 1000 560" preserveAspectRatio="xMidYMid meet">
+        <defs><marker id="ar" markerWidth="10" markerHeight="10" refX="5" refY="5" orient="auto"><path d="M1,1 L9,5 L1,9 Z" class="arrow"/></marker></defs>
+
+        <!-- chilled-water supply pipe: chiller -> pump -> valve -> coil -->
+        <g>
+          <line class="pipe-o" x1="150" y1="150" x2="250" y2="150"/><line class="pipe-i" x1="150" y1="150" x2="250" y2="150"/><line class="pipe-h" x1="150" y1="147" x2="250" y2="147"/>
+          <line class="pipe-o" x1="330" y1="150" x2="470" y2="150"/><line class="pipe-i" x1="330" y1="150" x2="470" y2="150"/><line class="pipe-h" x1="330" y1="147" x2="470" y2="147"/>
+        </g>
+        <!-- return pipe (coil -> chiller), lower -->
+        <g opacity=".85">
+          <line class="pipe-o" x1="120" y1="150" x2="120" y2="250"/><line class="pipe-i" x1="120" y1="150" x2="120" y2="250"/>
+          <line class="pipe-o" x1="120" y1="250" x2="500" y2="250"/><line class="pipe-i" x1="120" y1="250" x2="500" y2="250"/>
+          <line class="pipe-o" x1="500" y1="250" x2="500" y2="185"/><line class="pipe-i" x1="500" y1="250" x2="500" y2="185"/>
+          <text x="300" y="245" class="lbls" text-anchor="middle">CHW RETURN</text>
+        </g>
+
+        <!-- chiller -->
+        <g transform="translate(60,105)">
+          <rect class="eqf" x="0" y="0" width="90" height="92" rx="3"/>
+          <rect class="eqhi" x="3" y="3" width="84" height="3"/>
+          <rect class="eqd" x="12" y="18" width="66" height="10" rx="2"/><rect class="eqd" x="12" y="36" width="66" height="10" rx="2"/><rect class="eqd" x="12" y="54" width="66" height="10" rx="2"/><rect class="eqd" x="12" y="72" width="66" height="10" rx="2"/>
+          <text x="45" y="110" text-anchor="middle" class="lbl">Chiller</text><text x="45" y="124" text-anchor="middle" class="lbls">CH-1</text>
+        </g>
+
+        <!-- CHW pump -->
+        <g transform="translate(250,116)">
+          <circle class="eqf" cx="40" cy="34" r="30"/><circle class="eqhi" cx="32" cy="24" r="4"/>
+          <path class="eqf2" d="M40,14 L60,34 L40,54 Z"/><circle class="eqd" cx="40" cy="34" r="5"/>
+          <text x="40" y="86" text-anchor="middle" class="lbl">CHW Pump</text><text x="40" y="100" text-anchor="middle" class="lbls">CHWP-1</text>
+        </g>
+
+        <!-- TV-1 valve -->
+        <g transform="translate(392,150)">
+          <path class="valv" d="M0,0 L-14,-11 L-14,11 Z M0,0 L14,-11 L14,11 Z"/>
+          <circle cx="0" cy="0" r="4" class="eqd"/>
+          <text x="0" y="-18" text-anchor="middle" class="lbls">TV-1</text>
+        </g>
+
+        <!-- cooling coil (finned) -->
+        <g transform="translate(470,108)">
+          <rect class="eqf" x="0" y="0" width="96" height="86" rx="3"/>
+          <rect class="eqhi" x="3" y="3" width="90" height="3"/>
+          <g class="fin">
+            <line x1="12" y1="12" x2="12" y2="74"/><line x1="24" y1="12" x2="24" y2="74"/><line x1="36" y1="12" x2="36" y2="74"/><line x1="48" y1="12" x2="48" y2="74"/><line x1="60" y1="12" x2="60" y2="74"/><line x1="72" y1="12" x2="72" y2="74"/><line x1="84" y1="12" x2="84" y2="74"/>
+          </g>
+          <text x="48" y="104" text-anchor="middle" class="lbl">Cooling Coil</text><text x="48" y="118" text-anchor="middle" class="lbls">AHU-1</text>
+        </g>
+
+        <!-- supply-air duct: coil -> fan -->
+        <line class="duct" x1="566" y1="151" x2="660" y2="151"/>
+
+        <!-- SUPPLY FAN A (animated) -->
+        <g id="fan" class="fan run" transform="translate(660,96)">
+          <rect class="eqf" x="0" y="0" width="112" height="112" rx="4"/>
+          <rect class="eqhi" x="3" y="3" width="106" height="3"/>
+          <g transform="translate(56,56)">
+            <circle class="ring" r="44"/>
+            <g class="blades" id="blades">
+              <g class="bset"><path class="bl" d="M0,-3 C 18,-11 36,-6 38,-18 C 26,-27 9,-23 0,-8 Z"/></g>
+              <g class="bset" transform="rotate(60)"><path class="bl" d="M0,-3 C 18,-11 36,-6 38,-18 C 26,-27 9,-23 0,-8 Z"/></g>
+              <g class="bset" transform="rotate(120)"><path class="bl" d="M0,-3 C 18,-11 36,-6 38,-18 C 26,-27 9,-23 0,-8 Z"/></g>
+              <g class="bset" transform="rotate(180)"><path class="bl" d="M0,-3 C 18,-11 36,-6 38,-18 C 26,-27 9,-23 0,-8 Z"/></g>
+              <g class="bset" transform="rotate(240)"><path class="bl" d="M0,-3 C 18,-11 36,-6 38,-18 C 26,-27 9,-23 0,-8 Z"/></g>
+              <g class="bset" transform="rotate(300)"><path class="bl" d="M0,-3 C 18,-11 36,-6 38,-18 C 26,-27 9,-23 0,-8 Z"/></g>
+            </g>
+            <circle class="hub" r="8"/>
+          </g>
+          <text x="56" y="130" text-anchor="middle" class="lbl">Supply Fan A</text><text x="56" y="144" text-anchor="middle" class="lbls">SF-A</text>
+        </g>
+
+        <!-- SF-B standby -->
+        <g transform="translate(800,120)" opacity=".7">
+          <rect class="eqf2" x="0" y="0" width="58" height="88" rx="4"/>
+          <text x="29" y="42" text-anchor="middle" class="lbls">SF-B</text><text x="29" y="58" text-anchor="middle" class="lbls">STBY</text>
+        </g>
+
+        <!-- airflow down to cold aisle -->
+        <g id="airflow"><line x1="700" y1="254" x2="700" y2="280" stroke="#bfe0ff" stroke-width="3" marker-end="url(#ar)"/><line x1="732" y1="254" x2="732" y2="280" stroke="#bfe0ff" stroke-width="3" marker-end="url(#ar)"/></g>
+        <text x="716" y="306" text-anchor="middle" class="lbls">COLD AISLE — ROW A</text>
+
+        <!-- tag boxes + faceplate + annunciator are injected here -->
+        <g id="tagboxes"></g>
+        <g id="annun"></g>
+        <g id="faceplates"></g>
+      </svg>
+    </div>
+
+    <!-- TREND -->
+    <div class="view off" id="v_trends">
+      <div class="trendhdr">INLET TEMPERATURE (°C) &amp; FAN SPEED (%) — 60 s CHART RECORDER</div>
+      <div class="trendwrap">
+        <div class="tlegend"><span class="t">&#9473; INLET °C</span><span class="f">&#9473; FAN %</span><span class="w">&#9476; WARN 27</span><span class="c">&#9476; CRIT 32</span></div>
+        <svg width="100%" height="100%" viewBox="0 0 1000 500" preserveAspectRatio="none">
+          <g id="b_grid"></g>
+          <line id="b_warn" x1="60" x2="980"/><line id="b_crit" x1="60" x2="980"/>
+          <polyline id="b_fline" points=""/><polyline id="b_tline" points=""/>
+          <g id="b_yax"></g><g id="b_xax"></g>
+        </svg>
+      </div>
+    </div>
+
+    <!-- FACEPLATE (full) -->
+    <div class="view off" id="v_drive">
+      <svg class="pg" viewBox="0 0 1000 560" preserveAspectRatio="xMidYMid meet">
+        <g id="faceplate_full"></g>
+      </svg>
+    </div>
+
+    <!-- ALARMS -->
+    <div class="view off" id="v_alarms">
+      <div class="altools">
+        <button id="b_ackall" class="albtn">ACK ALL</button>
+        <span class="alinfo"><b id="b_unack">0</b> unacknowledged &middot; <b id="b_albuf">0</b> in buffer</span>
+      </div>
+      <div class="listwrap alist">
+        <table><thead><tr><th style="width:104px">Time</th><th style="width:86px">Tag</th><th>Description</th><th style="width:52px">Pri</th><th style="width:94px">State</th><th style="width:74px">ACK</th></tr></thead>
+        <tbody id="b_alarms"></tbody></table>
+      </div>
+    </div>
+
+    <!-- NETWORK -->
+    <div class="view off" id="v_network">
+      <svg class="pg" viewBox="0 0 1000 520" preserveAspectRatio="xMidYMid meet">
+        <line class="netline" x1="230" y1="150" x2="500" y2="150"/>
+        <line class="netline" x1="500" y1="120" x2="500" y2="330"/>
+        <line class="netline" x1="500" y1="330" x2="430" y2="330"/>
+        <line class="netline mb" x1="560" y1="330" x2="770" y2="330"/>
+        <g transform="translate(110,120)"><rect class="netbox" width="120" height="58" rx="3"/><text x="60" y="26" text-anchor="middle" class="nettxt">EWS bridge</text><text x="60" y="44" text-anchor="middle" class="netsm">172.21.5.10</text></g>
+        <g transform="translate(440,96)"><rect class="netbox" width="120" height="48" rx="3"/><text x="60" y="30" text-anchor="middle" class="netsm">ot-net /24</text></g>
+        <g transform="translate(430,300)"><rect class="netbox self" width="130" height="60" rx="3"/><text x="65" y="27" text-anchor="middle" class="nettxt">THIS HMI</text><text x="65" y="46" text-anchor="middle" class="netsm">172.21.5.30</text></g>
+        <g transform="translate(770,298)"><rect class="netbox drv" width="160" height="64" rx="3"/><text x="80" y="28" text-anchor="middle" class="nettxt">ATV630 drive</text><text x="80" y="48" text-anchor="middle" class="netsm">172.21.5.20:502</text></g>
+        <text x="665" y="322" text-anchor="middle" class="netsm" fill="#7fe0a0">Modbus/TCP · FC3 read</text>
+        <text x="500" y="430" text-anchor="middle" class="netsm" fill="#9fc0ff">MONITOR-ONLY STATION &middot; MODBUS/TCP UNIT 1 &middot; SCAN 1000 ms</text>
+      </svg>
+    </div>
+
+  </div><!-- /field -->
+
+  <!-- bottom nav (beveled) -->
+  <div class="nav" id="nav">
+    <button class="on" data-view="overview">OVERVIEW<span class="s">process graphic</span></button>
+    <button data-view="trends">TREND<span class="s">inlet &amp; fan</span></button>
+    <button data-view="drive">DRIVE FACEPLATE<span class="s">ATV630 · unit 1</span></button>
+    <button data-view="alarms">ALARMS<span class="s" id="b_alcount">0 active</span></button>
+    <button data-view="network">NETWORK<span class="s">control LAN</span></button>
+    <span class="sp"></span>
+    <button class="clockbtn"><span class="seg" id="clk2">--:--:--</span><span class="s" id="datef">----</span></button>
+  </div>
+
+  <!-- status bar -->
+  <div class="status">
+    <div class="s"><span class="led" id="b_led"></span><span id="b_comm">connecting</span></div>
+    <div class="s">SCAN <b>1000</b> ms</div>
+    <div class="s">UNIT <b>1</b> · <b>502</b>/TCP</div>
+    <div class="s">QUALITY <b id="b_qual">--</b></div>
+    <div class="s">ETA <b id="b_eta">--</b></div>
+    <div class="s sp"></div>
+    <div class="s">OPER <b>svc_maint</b></div>
+  </div>
+</div>
+
+<script>
+"use strict";
+const $=id=>document.getElementById(id);
+const NS="http://www.w3.org/2000/svg";
+const QS=new URLSearchParams(location.search);
+const stateParam=QS.get("state");
+const INTERVAL=QS.has("fast")?250:1000;
+
+/* theme */
+(function(){
+  let t="day"; try{t=localStorage.getItem("rowa-theme")||"day";}catch(e){}
+  if(QS.get("theme")==="night"||QS.get("theme")==="day")t=QS.get("theme");
+  if(QS.get("theme")==="light")t="day"; if(QS.get("theme")==="dark")t="night";
+  document.documentElement.setAttribute("data-theme",t);
+  $("daynight").onclick=()=>{const n=document.documentElement.getAttribute("data-theme")==="day"?"night":"day";
+    document.documentElement.setAttribute("data-theme",n);try{localStorage.setItem("rowa-theme",n);}catch(e){}};
+})();
+
+/* ---- build LCD tag boxes into the SVG ---- */
+function mk(tag,attrs,txt){const e=document.createElementNS(NS,tag);for(const k in attrs)e.setAttribute(k,attrs[k]);if(txt!=null)e.textContent=txt;return e;}
+const TAGS=[
+  {id:"hz",    x:596, y:60,  w:150, lab:"OUTPUT FREQ",      unit:"Hz", tagn:"RFR"},
+  {id:"rpm",   x:792, y:60,  w:150, lab:"MOTOR SPEED",      unit:"rpm",tagn:"RFRD"},
+  {id:"inlet", x:632, y:322, w:150, lab:"COLD-AISLE", unit:"°C", tagn:"INLET·5001"},
+  {id:"cur",   x:372, y:432, w:150, lab:"MOTOR CURRENT",    unit:"A",  tagn:"LCR"},
+  {id:"mth",   x:372, y:476, w:150, lab:"MOTOR THERMAL",    unit:"%",  tagn:"THR"},
+  {id:"air",   x:372, y:520, w:150, lab:"AIRFLOW",          unit:"%",  tagn:"calc"},
+  {id:"mains", x:536, y:432, w:150, lab:"MAINS VOLTAGE",    unit:"V",  tagn:"ULN"},
+  {id:"dth",   x:536, y:476, w:150, lab:"DRIVE THERMAL",    unit:"%",  tagn:"THD"},
+];
+function buildTags(){
+  const g=$("tagboxes");
+  TAGS.forEach(t=>{
+    const box=mk("g",{transform:`translate(${t.x},${t.y})`});
+    box.appendChild(mk("text",{class:"tb-lab",x:2,y:-4},t.lab+" · "+t.tagn));
+    box.appendChild(mk("rect",{class:"tb-bg",x:0,y:0,width:t.w,height:22,rx:1}));
+    box.appendChild(mk("rect",{class:"tb-ok",id:"ok_"+t.id,x:1,y:1,width:24,height:20}));
+    box.appendChild(mk("text",{class:"tb-okt",x:13,y:15,"text-anchor":"middle"},"OK"));
+    const uw=30;
+    box.appendChild(mk("rect",{class:"tb-u",x:t.w-uw,y:0,width:uw,height:22}));
+    box.appendChild(mk("text",{class:"tb-ut",x:t.w-uw/2,y:15,"text-anchor":"middle"},t.unit));
+    box.appendChild(mk("text",{class:"tb-val",id:"v_"+t.id,x:t.w-uw-8,y:16,"text-anchor":"end"},"--"));
+    g.appendChild(box);
+  });
+}
+function setTag(id,val,cls,online){
+  const v=$("v_"+id),ok=$("ok_"+id);
+  v.textContent=online?val:"--";
+  v.setAttribute("class","tb-val"+(!online?" off":cls==="crit"?" crit":cls==="warn"?" warn":""));
+  const okcls=!online?"off":cls==="crit"?"off":cls==="warn"?"warn":"";
+  ok.setAttribute("class","tb-ok"+(okcls?" "+okcls:""));
+  ok.nextSibling.textContent = !online?"--":cls==="crit"?"AL":cls==="warn"?"W":"OK";
+}
+
+/* ---- annunciator lamp panel ---- */
+const LAMPS=[["INLET HIGH","hi"],["INLET CRIT","crit"],["DRIVE FAULT","flt"],["FAN STOPPED","fan"],["COMMS LOSS","comm"]];
+function buildAnn(){
+  const g=$("annun");const x0=708,y0=418,w=118,h=40,gapx=8,gapy=8;
+  g.appendChild(mk("text",{x:x0,y:y0-6,class:"lbls"},"ANNUNCIATOR"));
+  LAMPS.forEach((l,i)=>{
+    const col=i%2, row=(i-col)/2;
+    const tx=x0+col*(w+gapx), ty0=y0+row*(h+gapy);
+    const t=mk("g",{transform:`translate(${tx},${ty0})`});
+    t.appendChild(mk("rect",{id:"ann_"+l[1],class:"ann-tile",x:0,y:0,width:w,height:h,rx:2}));
+    t.appendChild(mk("rect",{id:"annl_"+l[1],class:"ann-lamp",x:8,y:h/2-6,width:11,height:11,rx:1}));
+    const lines=l[0].split(" ");
+    t.appendChild(mk("text",{id:"annt_"+l[1],class:"ann-txt",x:w/2,y:h/2-2},lines[0]));
+    t.appendChild(mk("text",{id:"annt2_"+l[1],class:"ann-txt",x:w/2,y:h/2+12},lines[1]||""));
+    g.appendChild(t);
+  });
+}
+function setLamp(key,on,cls){
+  const tile=$("ann_"+key),t1=$("annt_"+key),t2=$("annt2_"+key);
+  const c=on?(cls||"crit"):"";
+  tile.setAttribute("class","ann-tile"+(c?" "+c:""));
+  const lamp=$("annl_"+key);if(lamp)lamp.setAttribute("class","ann-lamp"+(c?" "+c:""));
+  t1.setAttribute("class","ann-txt"+(c?" "+c:""));t2.setAttribute("class","ann-txt"+(c?" "+c:""));
+}
+
+/* ---- retro control faceplate (SVG) : drive summary ---- */
+function faceplateSVG(host,big){
+  const s=big?1.5:1, X=40, Y=big?70:400;
+  const g=mk("g",{transform:`translate(${X},${Y}) scale(${s})`});
+  const W=300,H=150;
+  g.appendChild(mk("rect",{class:"cbox",x:0,y:0,width:W,height:H,rx:2}));
+  g.appendChild(mk("rect",{class:"cbox-hl",x:1.5,y:1.5,width:W-3,height:H-3}));
+  g.appendChild(mk("text",{class:"cbox-t",x:12,y:20},"DRIVE  ·  ATV630  ·  DC-COOL-VFD-01"));
+  // CMD / STATUS chips
+  const chip=(x,y,w,id,tid)=>{g.appendChild(mk("rect",{id:id,class:"chip chip-run",x:x,y:y,width:w,height:26,rx:2}));
+    g.appendChild(mk("text",{id:tid,class:"chip-t",x:x+w/2,y:y+18},"--"));};
+  g.appendChild(mk("text",{class:"seg",x:12,y:46,fill:"#0b0f14"},"CMD"));chip(60,32,90,host+"_cmd",host+"_cmdt");
+  g.appendChild(mk("text",{class:"seg",x:170,y:46,fill:"#0b0f14"},"RUN"));chip(212,32,76,host+"_run",host+"_runt");
+  // ref / out / rpm / A
+  const kv=(x,y,lab,id)=>{g.appendChild(mk("text",{x:x,y:y,fill:"#0b0f14",font:"11px Tahoma,'Segoe UI',sans-serif"},lab));
+    g.appendChild(mk("text",{id:host+"_"+id,x:x,y:y+16,class:"seg",fill:"#0b0f14","font-size":"14"},"--"));};
+  kv(12,84,"REF Hz","ref");kv(86,84,"OUT Hz","out");kv(160,84,"SPEED rpm","rpm");kv(250,84,"AMP","cur");
+  // ETA word
+  g.appendChild(mk("text",{x:12,y:126,fill:"#0b0f14",font:"11px Tahoma,'Segoe UI',sans-serif"},"ETA"));
+  g.appendChild(mk("text",{id:host+"_eta",x:44,y:126,class:"seg",fill:"#0b0f14"},"----"));
+  const bits=["RTS","SO","OE","FLT","QS","REM"];const bx=98;
+  bits.forEach((b,i)=>{const x=bx+i*32;
+    g.appendChild(mk("rect",{id:host+"_b"+i,x:x,y:114,width:30,height:16,rx:1,fill:"#8a8f95",stroke:"#4c5054"}));
+    g.appendChild(mk("text",{x:x+15,y:126,"text-anchor":"middle",fill:"#0b0f14",font:"bold 9px Tahoma,'Segoe UI',sans-serif"},b));});
+  return g;
+}
+const ETA_BITS=[0,1,2,3,5,9];  // RTS SO OE FLT QS REM
+function bindFaceplate(host,d,online){
+  const set=(id,t)=>{const e=$(host+"_"+id);if(e)e.textContent=t;};
+  if(!online){["cmdt","runt"].forEach(i=>{const e=$(host+"_"+i);if(e){e.textContent="--";}});
+    ["ref","out","rpm","cur"].forEach(i=>set(i,"--"));set("eta","----");
+    const c=$(host+"_cmd"),r=$(host+"_run");if(c)c.setAttribute("class","chip chip-stop");if(r)r.setAttribute("class","chip chip-stop");
+    ETA_BITS.forEach((b,i)=>{const e=$(host+"_b"+i);if(e)e.setAttribute("fill","#8a8f95");});return;}
+  set("ref",d.ref_hz.toFixed(1));set("out",d.out_hz.toFixed(1));set("rpm",d.rpm);set("cur",d.current_a.toFixed(1));
+  set("eta",d.eta_hex);
+  const running=d.running, cmdBox=$(host+"_cmd"),cmdT=$(host+"_cmdt"),runBox=$(host+"_run"),runT=$(host+"_runt");
+  if(cmdBox){cmdBox.setAttribute("class","chip "+(running?"chip-run":"chip-stop"));cmdT.textContent=running?"RUN 0x0F":"STOP";}
+  if(runBox){const on=d.rpm>1;runBox.setAttribute("class","chip "+(d.faulted?"chip-stop":on?"chip-run":"chip-stop"));runT.textContent=d.faulted?"FAULT":on?"RUNNING":"STOPPED";}
+  const eta=parseInt(d.eta_hex,16);
+  ETA_BITS.forEach((bit,i)=>{const e=$(host+"_b"+i);if(!e)return;const on=(eta>>bit)&1;
+    e.setAttribute("fill", on?(bit===3?"#e04030":"#2fb04a"):"#8a8f95");});
+}
+
+/* ---- drive-detail page: thermal bars + register list + fault box ---- */
+const DDREGS=[["Output freq","RFR·3202","out","Hz"],["Speed ref","LFR·8502","ref","Hz"],
+  ["Motor speed","RFRD·8604","rpm","rpm"],["Motor current","LCR·3204","cur","A"],
+  ["Torque","OTR·3205","trq","%"],["Motor thermal","THR·3207","mth","%"],
+  ["Drive thermal","THD·3208","dth","%"],["Mains volt","ULN·3210","uln","V"],
+  ["Motor volt","UOP·3211","uop","V"],["Cold-aisle","INLET·5001","inl","°C"]];
+function buildDriveDetail(){
+  const g=$("faceplate_full");
+  g.appendChild(mk("text",{class:"ddttl",x:520,y:60},"THERMAL / LOAD"));
+  [["MOTOR THERMAL","mth",70,90],["DRIVE THERMAL","dth",70,90],["TORQUE","trq",85,100]].forEach((b,i)=>{
+    const y=74+i*30;
+    g.appendChild(mk("text",{class:"ddlab",x:520,y:y+13},b[0]));
+    g.appendChild(mk("rect",{class:"ddtrack",x:636,y:y,width:300,height:18,rx:1}));
+    g.appendChild(mk("line",{class:"ddtick",x1:636+b[2]/100*300,y1:y,x2:636+b[2]/100*300,y2:y+18}));
+    g.appendChild(mk("line",{class:"ddtick crit",x1:636+b[3]/100*300,y1:y,x2:636+b[3]/100*300,y2:y+18}));
+    g.appendChild(mk("rect",{class:"ddbar",id:"ddbar_"+b[1],x:637,y:y+1,width:0,height:16}));
+    g.appendChild(mk("text",{class:"ddval",id:"ddbart_"+b[1],x:944,y:y+14,"text-anchor":"end"},"--"));
+  });
+  g.appendChild(mk("rect",{class:"ddbox",x:520,y:180,width:440,height:300,rx:2}));
+  g.appendChild(mk("text",{class:"ddttl",x:534,y:202,fill:"#eaf0ff"},"LIVE REGISTERS"));
+  DDREGS.forEach((r,i)=>{const y=228+i*25;
+    g.appendChild(mk("text",{class:"ddlab",x:534,y:y+2},r[0]));
+    g.appendChild(mk("text",{x:534,y:y+13,fill:"#6f8fc0",font:"9px 'Cascadia Mono',Consolas,monospace"},r[1]));
+    g.appendChild(mk("text",{class:"ddval",id:"ddr_"+r[2],x:912,y:y+6,"text-anchor":"end"},"--"));
+    g.appendChild(mk("text",{class:"ddunit",x:920,y:y+6},r[3]));
+  });
+  g.appendChild(mk("rect",{class:"ddbox",x:40,y:320,width:450,height:168,rx:2}));
+  g.appendChild(mk("text",{class:"ddttl",x:54,y:344,fill:"#eaf0ff"},"LAST FAULT / DIAGNOSTIC"));
+  const fl=(y,lab,id,val)=>{g.appendChild(mk("text",{class:"ddlab",x:54,y:y},lab));
+    g.appendChild(mk("text",{class:"ddval",id:id,x:156,y:y},val));};
+  fl(378,"CODE","ddf_code","— none —");
+  fl(408,"DESC","ddf_desc","no active fault");
+  fl(438,"ETA","ddf_eta","----");
+  fl(468,"SP / WARN / CRIT","ddf_lim","--");
+}
+function bindDriveDetail(d,online){
+  const bar=(k,pct,warn,crit)=>{const b=$("ddbar_"+k),t=$("ddbart_"+k);if(!b)return;
+    const p=online?Math.max(0,Math.min(100,pct)):0, cls=!online?"":p>=crit?"crit":p>=warn?"warn":"";
+    b.setAttribute("width",(p/100*298).toFixed(0));
+    b.setAttribute("class","ddbar"+(cls?" "+cls:""));
+    t.textContent=online?Math.round(pct)+"%":"--";t.setAttribute("class","ddval"+(!online?" off":cls?" "+cls:""));};
+  const reg=(k,val,cls)=>{const e=$("ddr_"+k);if(!e)return;e.textContent=online?val:"--";
+    e.setAttribute("class","ddval"+(!online?" off":cls?" "+cls:""));};
+  if(!online){
+    ["mth","dth","trq"].forEach(k=>bar(k,0,70,90));
+    DDREGS.forEach(r=>reg(r[2],"--",""));
+    $("ddf_code").textContent="COMM";$("ddf_code").setAttribute("class","ddval crit");
+    $("ddf_desc").textContent="Modbus poll timeout";$("ddf_desc").setAttribute("class","ddval crit");
+    $("ddf_eta").textContent="----";$("ddf_lim").textContent="--";return;
+  }
+  bar("mth",d.motor_thermal_pct,70,90);bar("dth",d.drive_thermal_pct,70,90);bar("trq",d.torque_pct,85,100);
+  reg("out",d.out_hz.toFixed(1),d.out_hz<3?"crit":d.out_hz<20?"warn":"");
+  reg("ref",d.ref_hz.toFixed(1),"");
+  reg("rpm",d.rpm,d.rpm<1?"crit":d.rpm<400?"warn":"");
+  reg("cur",d.current_a.toFixed(1),"");reg("trq",Math.round(d.torque_pct),"");
+  reg("mth",d.motor_thermal_pct,d.motor_thermal_pct>=90?"crit":d.motor_thermal_pct>=70?"warn":"");
+  reg("dth",d.drive_thermal_pct,"");reg("uln",d.mains_v,"");reg("uop",d.motor_v,"");
+  reg("inl",d.temp_c.toFixed(1),d.temp_c>=d.crit_c?"crit":d.temp_c>=d.warn_c?"warn":"");
+  const flt=d.faulted;
+  $("ddf_code").textContent=flt?"EPF1":"— none —";$("ddf_code").setAttribute("class","ddval"+(flt?" crit":""));
+  $("ddf_desc").textContent=flt?"External fault · cooling-loss trip":"no active fault";
+  $("ddf_desc").setAttribute("class","ddval"+(flt?" crit":""));
+  $("ddf_eta").textContent=d.eta_hex;
+  $("ddf_lim").textContent=d.setpoint_c.toFixed(0)+" / "+d.warn_c.toFixed(0)+" / "+d.crit_c.toFixed(0)+" °C";
+}
+
+/* ---- trend ---- */
+const H=[],NMAX=60,TMIN=15,TMAX=40,CX0=60,CX1=980,CY0=20,CY1=470;
+const ty=t=>CY1-(Math.max(TMIN,Math.min(TMAX,t))-TMIN)/(TMAX-TMIN)*(CY1-CY0);
+const fy=f=>CY1-Math.max(0,Math.min(100,f))/100*(CY1-CY0);
+const px=(i,n)=>n<2?CX0:CX0+i/(n-1)*(CX1-CX0);
+let tSeed=false;
+function seedTrend(wc,cc){
+  $("b_warn").setAttribute("y1",ty(wc));$("b_warn").setAttribute("y2",ty(wc));
+  $("b_crit").setAttribute("y1",ty(cc));$("b_crit").setAttribute("y2",ty(cc));
+  let g="",y="";[15,20,25,30,35,40].forEach(v=>{g+='<line class="tgrid" x1="'+CX0+'" x2="'+CX1+'" y1="'+ty(v)+'" y2="'+ty(v)+'"/>';
+    y+='<text class="tlabel" x="'+(CX0-8)+'" y="'+(ty(v)+4)+'" text-anchor="end">'+v+'</text>';});
+  $("b_grid").innerHTML=g;$("b_yax").innerHTML=y;tSeed=true;
+}
+function drawTrend(){
+  const n=H.length;if(!n)return;
+  $("b_tline").setAttribute("points",H.map((h,i)=>px(i,n).toFixed(0)+","+ty(h.t).toFixed(1)).join(" "));
+  $("b_fline").setAttribute("points",H.map((h,i)=>px(i,n).toFixed(0)+","+fy(h.f).toFixed(1)).join(" "));
+  let x="";[0,(n-1)>>1,n-1].forEach(i=>{if(H[i]){const a=i===n-1?"end":i===0?"start":"middle";
+    x+='<text class="tlabel" x="'+px(i,n).toFixed(0)+'" y="492" text-anchor="'+a+'">'+H[i].time+'</text>';}});
+  $("b_xax").innerHTML=x;
+}
+
+/* ---- alarms ---- */
+const AL=[];let last=null,alSeq=0;
+function pushAlarm(pri,tag,desc,cls){AL.unshift({id:++alSeq,t:new Date().toTimeString().slice(0,8),pri,tag,desc,cls,ack:false});if(AL.length>80)AL.pop();}
+function seedAlarms(){                       // plausible acked history so the buffer isn't a single row
+  [["06:14:02","LOW","CHWP-1","CHW pump CHWP-1 commanded RUN","NORMAL"],
+   ["06:14:09","LOW","SF-A","Supply fan SF-A ramp to 50.0 Hz","NORMAL"],
+   ["07:41:55","MED","THD","Drive thermal 58% — advisory","WARNING"],
+   ["07:42:34","LOW","THD","Drive thermal returned normal","NORMAL"]]
+  .forEach(a=>AL.push({id:++alSeq,t:a[0],pri:a[1],tag:a[2],desc:a[3],cls:a[4],ack:true}));
+}
+function drawAlarms(){
+  $("b_alarms").innerHTML=AL.length?AL.map(a=>{
+    const un=(!a.ack&&a.cls!=="NORMAL");
+    const rc=a.cls==="CRITICAL"?"crit":a.cls==="WARNING"?"warn":"ok";
+    const ack=a.ack?'<span class="ackd">&#10003; ACKD</span>':'<button class="rack" data-i="'+a.id+'">ACK</button>';
+    return '<tr class="'+rc+(un?' unack':'')+'"><td>'+a.t+'</td><td>'+a.tag+'</td><td>'+a.desc+'</td><td>'+a.pri+'</td><td>'+a.cls+'</td><td>'+ack+'</td></tr>';
+  }).join(""):'<tr><td colspan="6" style="color:#7fa0d0">no alarms in buffer</td></tr>';
+  const unack=AL.filter(a=>!a.ack&&a.cls!=="NORMAL").length;
+  $("b_alcount").textContent=unack+" active";
+  if($("b_unack"))$("b_unack").textContent=unack;
+  if($("b_albuf"))$("b_albuf").textContent=AL.length;
+}
+function ackAll(){AL.forEach(a=>a.ack=true);drawAlarms();}
+
+/* ---- fan ---- */
+function setFan(rpm,cls){const bl=$("blades");$("fan").setAttribute("class","fan "+cls);
+  if(rpm>1){bl.style.animationDuration=Math.max(0.32,Math.min(3,700/rpm)).toFixed(2)+"s";bl.style.animationPlayState="running";}
+  else bl.style.animationPlayState="paused";}
+
+/* ---- views ---- */
+const VIEWS=["overview","trends","drive","alarms","network"];
+const TITLES={overview:"CHILLED-WATER & SUPPLY-AIR OVERVIEW",trends:"INLET TEMPERATURE & FAN SPEED — TREND",
+  drive:"ATV630 DRIVE FACEPLATE — UNIT 1",alarms:"ALARM SUMMARY",network:"CONTROL NETWORK"};
+function setView(v){if(!VIEWS.includes(v))v="overview";
+  VIEWS.forEach(x=>$("v_"+x).classList.toggle("off",x!==v));
+  document.querySelectorAll("#nav button[data-view]").forEach(b=>b.classList.toggle("on",b.dataset.view===v));
+  $("bandtitle").textContent=TITLES[v];
+}
+document.querySelectorAll("#nav button[data-view]").forEach(b=>b.addEventListener("click",e=>{e.preventDefault();setView(b.dataset.view);}));
+document.querySelectorAll(".tbtn").forEach(b=>{if(b.id!=="daynight")b.addEventListener("click",e=>e.preventDefault());});
+
+buildTags();buildAnn();
+$("faceplates").appendChild(faceplateSVG("fp",false));
+$("faceplate_full").appendChild(faceplateSVG("fpf",true));
+buildDriveDetail();
+seedAlarms();drawAlarms();
+$("b_ackall").onclick=ackAll;
+$("b_alarms").addEventListener("click",e=>{const b=e.target.closest(".rack");if(!b)return;
+  const a=AL.find(x=>x.id===+b.dataset.i);if(a){a.ack=true;drawAlarms();}});
+if(QS.get("view"))setView(QS.get("view"));
+
+async function tick(){
+  const now=new Date(),hhmmss=now.toTimeString().slice(0,8);
+  $("clk").textContent=hhmmss;$("clk2").textContent=hhmmss;
+  $("datef").textContent=now.toISOString().slice(0,10);
+  let d;try{d=await(await fetch("/api/state"+(stateParam?("?state="+stateParam):""))).json();}catch(e){return;}
+
+  const online=!!d.online;
+  const S=online?d.state:"LOST",cls=S==="CRITICAL"?"crit":S==="WARNING"?"warn":"ok";
+  // status bar + comms
+  $("b_led").className="led"+(online?"":" bad");
+  $("b_comm").textContent=online?"COMMS OK":"COMMS LOST";
+  $("b_qual").textContent=online?"GOOD":"BAD";$("b_eta").textContent=online?d.eta_hex:"----";
+
+  // active-fault banner: appears only once the drive populates its fault string (post-trip)
+  const fb=$("faultbanner");
+  if(fb){const fs=(online&&d.fault_log)?d.fault_log:"";fb.textContent=fs;fb.classList.toggle("on",!!fs);}
+
+  if(!online){
+    ["inlet","hz","rpm","cur","air","mth","dth","mains"].forEach(id=>setTag(id,"--","",false));
+    setFan(0,"unknown");$("airflow").setAttribute("opacity",0);
+    bindFaceplate("fp",null,false);bindFaceplate("fpf",null,false);bindDriveDetail(null,false);
+    LAMPS.forEach(l=>setLamp(l[1],false));setLamp("comm",true,"crit");
+    if(last!=="LOST"){pushAlarm("HIGH","COMMS","Modbus poll timeout 172.21.5.20:502","CRITICAL");last="LOST";drawAlarms();}
+    return;
+  }
+  if(!tSeed)seedTrend(d.warn_c,d.crit_c);
+  const fanpct=Math.round(d.out_hz/50*100);
+
+  setTag("inlet",d.temp_c.toFixed(1),cls,true);
+  setTag("hz",d.out_hz.toFixed(1),d.out_hz<3?"crit":d.out_hz<20?"warn":"ok",true);
+  setTag("rpm",d.rpm,d.rpm<1?"crit":d.rpm<400?"warn":"ok",true);
+  setTag("cur",d.current_a.toFixed(1),"ok",true);
+  setTag("air",Math.round(d.airflow_pct),d.airflow_pct<5?"crit":d.airflow_pct<40?"warn":"ok",true);
+  setTag("mth",d.motor_thermal_pct,d.motor_thermal_pct>=90?"crit":"ok",true);
+  setTag("dth",d.drive_thermal_pct,"ok",true);
+  setTag("mains",d.mains_v,"ok",true);
+
+  setFan(d.rpm, d.faulted?"fault":(d.rpm>1?"run":"stop"));
+  $("airflow").setAttribute("opacity", d.airflow_pct>3?1:0.12);
+
+  bindFaceplate("fp",d,true);bindFaceplate("fpf",d,true);bindDriveDetail(d,true);
+
+  // annunciator
+  setLamp("hi", d.temp_c>=d.warn_c && d.temp_c<d.crit_c, "warn");
+  setLamp("crit", d.temp_c>=d.crit_c, "crit");
+  setLamp("flt", d.faulted, "crit");
+  setLamp("fan", d.rpm<1, "crit");
+  setLamp("comm", false);
+
+  H.push({time:hhmmss,t:d.temp_c,f:d.out_hz/50*100});if(H.length>NMAX)H.shift();drawTrend();
+
+  if(S!==last){
+    if(S==="WARNING")pushAlarm("HIGH","INLET","Cold-aisle inlet above warning "+d.warn_c+" C","WARNING");
+    if(S==="CRITICAL")pushAlarm("HIGH","INLET","Cold-aisle inlet CRITICAL — cooling lost","CRITICAL");
+    if(S==="NORMAL"&&last)pushAlarm("LOW","INLET","Cold-aisle inlet returned to normal","NORMAL");
+    last=S;drawAlarms();
+  }
+}
+tick();setInterval(tick,INTERVAL);
+</script>
+</body>
+</html>

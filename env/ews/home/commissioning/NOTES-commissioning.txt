@@ -1,0 +1,24 @@
+MW-ENG-01  .  commissioning scratch notes (contractor handover)
+================================================================
+
+Row A supply VFD is a Schneider ATV630 on the control network
+(Modbus/TCP, unit id 1). The old custom helper scripts were pulled at
+handover -- use the standard tools that are already on this box:
+the pymodbus console and mbpoll.
+
+Device identity (ATV630)
+  - The basic identity read comes back almost empty. Don't stop there.
+  - Do an EXTENDED identity read (read code 3). The value that matters is
+    the private vendor object: 0x80 = 128.
+
+Nameplate / asset data
+  - Lives in the 87xx holding registers on this node. Sweep that block
+    and read whatever is in it.
+
+Addressing gotcha
+  - This drive is zero-based on the wire. With mbpoll you MUST pass -0,
+    or every address lands one register off and you chase ghosts.
+
+(Commanding registers for the fan are NOT written down here -- get the
+current speed/command map from the site commissioning record or the
+vendor manual.)

@@ -1,0 +1,17 @@
+WORK ORDER  DC-1471                                   status: OPEN
+node: MW-ENG-01   asset: Row A cooling VFD            pri: 2 (high)
+opened by: facilities   assigned: controls integrator
+--------------------------------------------------------------------
+Symptom
+  Intermittent high-temp trips on the Row A cold aisle overnight. Operators
+  report the cooling fan "drops out" for short periods, inlet climbs, then
+  recovers on its own. No drive hardware fault stored at last visit.
+
+Actions outstanding
+  [ ] Site visit to reproduce and capture drive state during an event.
+  [ ] Review network segmentation for this node before handover (Purdue L3/L3.5).
+  [ ] Rotate the temporary night-shift login on this workstation.
+      Local operator accounts live in ../config/operators.conf (kept out of the
+      manuals folder). Still has the commissioning svc_maint entry - retire it
+      before handover.
+  [ ] Remove commissioning web portal from MW-ENG-01 when docs are archived.

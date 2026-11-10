@@ -1,0 +1,8 @@
+PANEL NETWORK DROPS - MW-ENG-01
+-------------------------------
+drop  location                 zone            note
+A-01  Row A control panel      control         drive, fieldbus
+A-02  Row A control panel      control         loop controller
+A-03  Row A control panel      control         process historian (trend logging)
+E-01  engineering workstation  office/control  dual-homed (see WO DC-1471)
+E-02  operator desk            office          HMI viewer

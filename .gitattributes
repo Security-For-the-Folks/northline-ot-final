@@ -1,0 +1,10 @@
+# This lab's containers are Linux. Force LF so shell entrypoints and shebangs
+# work even when the repo is cloned on Windows (where core.autocrlf=true would
+# otherwise rewrite scripts with CRLF and break `exec entrypoint.sh`).
+* text=auto eol=lf
+
+# Never touch these as text.
+*.pdf binary
+*.png binary
+*.jpg binary
+*.gif binary
